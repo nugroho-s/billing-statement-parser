@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { parseTransactions as identifyAndParseTransactions, type Transaction } from '$lib';
+	import { parsers, type Transaction, type Parser } from '$lib';
 
 	let pdfjsLib: typeof import('pdfjs-dist');
 	let showPasswordPrompt = $state(false);
@@ -8,7 +8,9 @@
 	let pendingFileData: Uint8Array | null = $state(null);
 	let transactions = $state<Transaction[]>([]);
 	let csvOutput = $state('');
-	let detectedParser = $state<string | null>(null);
+	let selectedParser = $state<string>('');
+	let extractedText = $state<string>('');
+	let showExtractedText = $state(false);
 	let parseError = $state<string | null>(null);
 
 	onMount(async () => {
@@ -84,22 +86,13 @@
 		try {
 			const result = await extractTextFromPdf(data, password);
 			console.log('Extracted text length:', result.text.length);
+			console.log('Full extracted text:', result.text);
 			
-			const parseResult = identifyAndParseTransactions(result.text);
-			
-			if (!parseResult.parser) {
-				parseError = 'Unable to identify PDF template. This format is not supported.';
-				detectedParser = null;
-				transactions = [];
-			} else {
-				detectedParser = parseResult.parser.name;
-				transactions = parseResult.transactions;
-				parseError = null;
-			}
-			
-			console.log('Detected parser:', detectedParser);
-			console.log('Parsed transactions count:', transactions.length);
-			csvOutput = convertToCsv(transactions);
+			extractedText = result.text;
+			transactions = [];
+			csvOutput = '';
+			selectedParser = '';
+			parseError = null;
 			showPasswordPrompt = false;
 			password = '';
 			pendingFileData = null;
@@ -112,6 +105,21 @@
 				throw error;
 			}
 		}
+	}
+
+	function applyParser() {
+		if (!selectedParser || !extractedText) return;
+		
+		const parser = parsers.find((p: Parser) => p.name === selectedParser);
+		if (!parser) {
+			parseError = 'Selected parser not found.';
+			return;
+		}
+
+		transactions = parser.parse(extractedText);
+		csvOutput = convertToCsv(transactions);
+		parseError = null;
+		console.log('Parsed transactions count:', transactions.length);
 	}
 
 	async function submitPassword() {
@@ -141,7 +149,9 @@
 		showPasswordPrompt = false;
 		password = '';
 		pendingFileData = null;
-		detectedParser = null;
+		selectedParser = '';
+		extractedText = '';
+		showExtractedText = false;
 		parseError = null;
 	}
 
@@ -160,49 +170,78 @@
 				<button type="button" onclick={cancelPassword}>Cancel</button>
 			</div>
 		</div>
+	{:else if extractedText}
+		<div class="results">
+			<h2>PDF Extracted</h2>
+			
+			<div class="parser-selection">
+				<label for="parserSelect">Select template:</label>
+				<select id="parserSelect" bind:value={selectedParser}>
+					<option value="">-- Choose a template --</option>
+					{#each parsers as parser}
+						<option value={parser.name}>{parser.name}</option>
+					{/each}
+				</select>
+				<button type="button" onclick={applyParser} disabled={!selectedParser}>Parse</button>
+			</div>
+
+			<div class="text-toggle">
+				<button type="button" onclick={() => showExtractedText = !showExtractedText}>
+					{showExtractedText ? 'Hide' : 'Show'} Extracted Text
+				</button>
+			</div>
+
+			{#if showExtractedText}
+				<div class="extracted-text">
+					<h3>Extracted Text</h3>
+					<textarea readonly value={extractedText} rows="15"></textarea>
+				</div>
+			{/if}
+
+			{#if transactions.length > 0}
+				<h3>Parsed Transactions ({transactions.length})</h3>
+				{#if selectedParser}
+					<p class="parser-info">Template: <strong>{selectedParser}</strong></p>
+				{/if}
+				<button type="button" onclick={downloadCsv}>Download CSV</button>
+				<table>
+					<thead>
+						<tr>
+							<th>Transaction Date</th>
+							<th>Posting Date</th>
+							<th>Description</th>
+							<th>Amount</th>
+						</tr>
+					</thead>
+					<tbody>
+						{#each transactions as t}
+							<tr>
+								<td>{t.transactionDate}</td>
+								<td>{t.postingDate}</td>
+								<td>{t.description}</td>
+								<td>{t.amount}</td>
+							</tr>
+						{/each}
+					</tbody>
+				</table>
+				<h3>CSV Output</h3>
+				<textarea readonly value={csvOutput} rows="10"></textarea>
+			{/if}
+
+			<button type="button" onclick={resetState}>Upload Another</button>
+		</div>
 	{:else if parseError}
 		<div class="error-container">
 			<h2>Error</h2>
 			<p>{parseError}</p>
 			<button type="button" onclick={resetState}>Try Again</button>
 		</div>
-	{:else if transactions.length === 0}
+	{:else}
 		<form class="upload-form">
 			<label for="pdfFile">Upload PDF:</label>
 			<input type="file" id="pdfFile" accept="application/pdf" />
 			<button type="button" onclick={handleUpload}>Upload</button>
 		</form>
-	{:else}
-		<div class="results">
-			<h2>Parsed Transactions ({transactions.length})</h2>
-			{#if detectedParser}
-				<p class="parser-info">Detected template: <strong>{detectedParser}</strong></p>
-			{/if}
-			<button type="button" onclick={downloadCsv}>Download CSV</button>
-			<table>
-				<thead>
-					<tr>
-						<th>Transaction Date</th>
-						<th>Posting Date</th>
-						<th>Description</th>
-						<th>Amount</th>
-					</tr>
-				</thead>
-				<tbody>
-					{#each transactions as t}
-						<tr>
-							<td>{t.transactionDate}</td>
-							<td>{t.postingDate}</td>
-							<td>{t.description}</td>
-							<td>{t.amount}</td>
-						</tr>
-					{/each}
-				</tbody>
-			</table>
-			<h3>CSV Output</h3>
-			<textarea readonly value={csvOutput} rows="10"></textarea>
-			<button type="button" onclick={() => { transactions = []; csvOutput = ''; detectedParser = null; parseError = null; }}>Upload Another</button>
-		</div>
 	{/if}
 </div>
 
@@ -230,6 +269,25 @@
 	.parser-info {
 		color: #388e3c;
 		margin: 10px 0;
+	}
+	.parser-selection {
+		margin: 20px 0;
+		display: flex;
+		justify-content: center;
+		align-items: center;
+		gap: 10px;
+		flex-wrap: wrap;
+	}
+	.parser-selection select {
+		padding: 8px;
+		min-width: 200px;
+	}
+	.text-toggle {
+		margin: 15px 0;
+	}
+	.extracted-text {
+		margin: 20px 0;
+		text-align: left;
 	}
 	.password-prompt input {
 		display: block;
