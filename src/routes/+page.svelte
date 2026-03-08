@@ -8,6 +8,7 @@
 	let pendingFileData: Uint8Array | null = $state(null);
 	let transactions = $state<Transaction[]>([]);
 	let csvOutput = $state('');
+	let totalAmount = $state<number>(0);
 	let selectedParser = $state<string>('');
 	let extractedText = $state<string>('');
 	let showExtractedText = $state(false);
@@ -118,6 +119,10 @@
 
 		transactions = parser.parse(extractedText);
 		csvOutput = convertToCsv(transactions);
+		totalAmount = transactions.reduce((sum, t) => {
+			const amount = parseFloat(t.amount.replace(/,/g, ''));
+			return sum + (isNaN(amount) ? 0 : amount);
+		}, 0);
 		parseError = null;
 		console.log('Parsed transactions count:', transactions.length);
 	}
@@ -153,6 +158,7 @@
 		extractedText = '';
 		showExtractedText = false;
 		parseError = null;
+		totalAmount = 0;
 	}
 
 	function cancelPassword() {
@@ -203,6 +209,7 @@
 				{#if selectedParser}
 					<p class="parser-info">Template: <strong>{selectedParser}</strong></p>
 				{/if}
+				<p class="total-amount">Total: <strong>{totalAmount.toLocaleString()}</strong></p>
 				<button type="button" onclick={downloadCsv}>Download CSV</button>
 				<table>
 					<thead>
@@ -269,6 +276,11 @@
 	.parser-info {
 		color: #388e3c;
 		margin: 10px 0;
+	}
+	.total-amount {
+		color: #1565c0;
+		margin: 10px 0;
+		font-size: 1.1em;
 	}
 	.parser-selection {
 		margin: 20px 0;
