@@ -210,13 +210,15 @@
 	.upload-container {
 		display: flex;
 		justify-content: center;
-		align-items: center;
-		height: 100vh;
+		align-items: flex-start;
+		min-height: 100vh;
 		padding: 20px;
+		padding-top: 40px;
 		box-sizing: border-box;
 	}
-	.upload-form, .password-prompt, .results, .error-container {
+	.upload-form, .password-prompt, .error-container {
 		text-align: center;
+		align-self: center;
 	}
 	.error-container {
 		max-width: 500px;
@@ -244,6 +246,7 @@
 	.results {
 		max-width: 900px;
 		width: 100%;
+		text-align: center;
 	}
 	table {
 		width: 100%;
