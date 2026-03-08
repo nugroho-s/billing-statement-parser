@@ -119,8 +119,16 @@
 
 		transactions = parser.parse(extractedText);
 		csvOutput = convertToCsv(transactions);
+		
+		const isBri = selectedParser === 'BRI';
 		totalAmount = transactions.reduce((sum, t) => {
-			const amount = parseFloat(t.amount.replace(/,/g, ''));
+			let amountStr = t.amount;
+			if (isBri) {
+				amountStr = amountStr.replace(/\./g, '');
+			} else {
+				amountStr = amountStr.replace(/,/g, '');
+			}
+			const amount = parseFloat(amountStr);
 			return sum + (isNaN(amount) ? 0 : amount);
 		}, 0);
 		parseError = null;
