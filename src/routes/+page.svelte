@@ -60,6 +60,10 @@
 		URL.revokeObjectURL(url);
 	}
 
+	function copyTotal() {
+		navigator.clipboard.writeText(totalAmount.toString());
+	}
+
 	async function handleUpload() {
 		const fileInput = document.getElementById('pdfFile') as HTMLInputElement;
 		const file = fileInput.files?.[0];
@@ -217,7 +221,7 @@
 				{#if selectedParser}
 					<p class="parser-info">Template: <strong>{selectedParser}</strong></p>
 				{/if}
-				<p class="total-amount">Total: <strong>{totalAmount.toLocaleString()}</strong></p>
+				<p class="total-amount">Total: <strong>{totalAmount.toLocaleString()}</strong> <button type="button" class="copy-btn" onclick={copyTotal}>Copy</button></p>
 				<button type="button" onclick={downloadCsv}>Download CSV</button>
 				<table>
 					<thead>
@@ -289,6 +293,11 @@
 		color: #1565c0;
 		margin: 10px 0;
 		font-size: 1.1em;
+	}
+	.copy-btn {
+		padding: 2px 8px;
+		font-size: 0.8em;
+		margin-left: 5px;
 	}
 	.parser-selection {
 		margin: 20px 0;
