@@ -9,4 +9,5 @@ export interface Parser {
 	identifier: string;
 	name: string;
 	parse(text: string): Transaction[];
+	getStatementDate?(text: string): string;
 }

@@ -2,6 +2,12 @@ import type { Parser, Transaction } from './types';
 
 const MANDIRI_EMAIL = 'mandiricare@bankmandiri.co.id';
 
+const MONTH_MAP: Record<string, string> = {
+	'Jan': '01', 'Feb': '02', 'Mar': '03', 'Apr': '04',
+	'May': '05', 'Jun': '06', 'Jul': '07', 'Aug': '08',
+	'Sep': '09', 'Oct': '10', 'Nov': '11', 'Dec': '12'
+};
+
 export const mandiriParser: Parser = {
 	identifier: MANDIRI_EMAIL,
 	name: 'Mandiri',
@@ -40,5 +46,15 @@ export const mandiriParser: Parser = {
 		}
 
 		return results;
+	},
+
+	getStatementDate(text: string): string {
+		const match = text.match(/Tanggal Cetak Tagihan\s+Statement Date\s+Tanggal Jatuh Tempo\s+Payment Due Date\s+(\d{2})-([A-Za-z]{3})-\d{2}/);
+		if (match) {
+			const month = MONTH_MAP[match[2]] || '01';
+			const year = new Date().getFullYear();
+			return `${year}-${month}`;
+		}
+		return '';
 	}
 };

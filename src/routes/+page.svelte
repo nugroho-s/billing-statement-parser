@@ -9,6 +9,7 @@
 	let transactions = $state<Transaction[]>([]);
 	let csvOutput = $state('');
 	let totalAmount = $state<number>(0);
+	let statementDate = $state<string>('');
 	let selectedParser = $state<string>('');
 	let extractedText = $state<string>('');
 	let showExtractedText = $state(false);
@@ -54,8 +55,9 @@
 		const blob = new Blob([csvOutput], { type: 'text/csv;charset=utf-8;' });
 		const url = URL.createObjectURL(blob);
 		const link = document.createElement('a');
+		const filename = statementDate ? `${selectedParser}_${statementDate}.csv` : 'transactions.csv';
 		link.href = url;
-		link.download = 'transactions.csv';
+		link.download = filename;
 		link.click();
 		URL.revokeObjectURL(url);
 	}
@@ -123,6 +125,7 @@
 
 		transactions = parser.parse(extractedText);
 		csvOutput = convertToCsv(transactions);
+		statementDate = parser.getStatementDate?.(extractedText) || '';
 		
 		const isBri = selectedParser === 'BRI';
 		totalAmount = transactions.reduce((sum, t) => {
@@ -171,6 +174,7 @@
 		showExtractedText = false;
 		parseError = null;
 		totalAmount = 0;
+		statementDate = '';
 	}
 
 	function cancelPassword() {

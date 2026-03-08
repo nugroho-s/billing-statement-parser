@@ -43,5 +43,15 @@ export const briParser: Parser = {
 		}
 
 		return results;
+	},
+
+	getStatementDate(text: string): string {
+		const match = text.match(/\d{4}-\d{2}XX-XXXX-\d{4}\s+\d{2}-\d{2}-(\d{4})\s+[\d.,]+\s+[\d.,]+\s+(\d{2})-(\d{2})-(\d{4})/);
+		if (match) {
+			const year = match[4];
+			const month = match[3];
+			return `${year}-${month}`;
+		}
+		return '';
 	}
 };
