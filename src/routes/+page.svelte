@@ -1,12 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-
-	interface Transaction {
-		transactionDate: string;
-		postingDate: string;
-		description: string;
-		amount: string;
-	}
+	import { parseTransactions as identifyAndParseTransactions, type Transaction } from '$lib';
 
 	let pdfjsLib: typeof import('pdfjs-dist');
 	let showPasswordPrompt = $state(false);
@@ -14,6 +8,8 @@
 	let pendingFileData: Uint8Array | null = $state(null);
 	let transactions = $state<Transaction[]>([]);
 	let csvOutput = $state('');
+	let detectedParser = $state<string | null>(null);
+	let parseError = $state<string | null>(null);
 
 	onMount(async () => {
 		pdfjsLib = await import('pdfjs-dist');
@@ -41,38 +37,6 @@
 		}
 
 		return { text: fullText, pages: numPages };
-	}
-
-	function parseTransactions(text: string): Transaction[] {
-		const results: Transaction[] = [];
-		const transactionRegex = /(\d{2}-[A-Za-z]{3}-\d{2})\s+(\d{2}-[A-Za-z]{3}-\d{2})\s+(.+?)\s+([\d,]+\.\d{2})\s*(CR)?/g;
-
-		let match;
-		while ((match = transactionRegex.exec(text)) !== null) {
-			const description = match[3].trim();
-			if (description.includes('Transaction Date') || 
-				description.includes('Posting Date') || 
-				description.includes('Keterangan') ||
-				description.includes('Description') ||
-				description.includes('Card Type') ||
-				description.includes('Card Number') ||
-				description.includes('Product Name') ||
-				description.includes('Payment Due Date') ||
-				description.includes('Statement Date') ||
-				description.includes('PAYMENT THANK YOU')) {
-				continue;
-			}
-			const isCredit = match[5] === 'CR';
-			const amount = isCredit ? `-${match[4]}` : match[4];
-			results.push({
-				transactionDate: match[1],
-				postingDate: match[2],
-				description,
-				amount
-			});
-		}
-
-		return results;
 	}
 
 	function convertToCsv(transactions: Transaction[]): string {
@@ -120,8 +84,20 @@
 		try {
 			const result = await extractTextFromPdf(data, password);
 			console.log('Extracted text length:', result.text.length);
-			console.log('Full extracted text:', result.text);
-			transactions = parseTransactions(result.text);
+			
+			const parseResult = identifyAndParseTransactions(result.text);
+			
+			if (!parseResult.parser) {
+				parseError = 'Unable to identify PDF template. This format is not supported.';
+				detectedParser = null;
+				transactions = [];
+			} else {
+				detectedParser = parseResult.parser.name;
+				transactions = parseResult.transactions;
+				parseError = null;
+			}
+			
+			console.log('Detected parser:', detectedParser);
 			console.log('Parsed transactions count:', transactions.length);
 			csvOutput = convertToCsv(transactions);
 			showPasswordPrompt = false;
@@ -165,6 +141,8 @@
 		showPasswordPrompt = false;
 		password = '';
 		pendingFileData = null;
+		detectedParser = null;
+		parseError = null;
 	}
 
 	function cancelPassword() {
@@ -182,6 +160,12 @@
 				<button type="button" onclick={cancelPassword}>Cancel</button>
 			</div>
 		</div>
+	{:else if parseError}
+		<div class="error-container">
+			<h2>Error</h2>
+			<p>{parseError}</p>
+			<button type="button" onclick={resetState}>Try Again</button>
+		</div>
 	{:else if transactions.length === 0}
 		<form class="upload-form">
 			<label for="pdfFile">Upload PDF:</label>
@@ -191,6 +175,9 @@
 	{:else}
 		<div class="results">
 			<h2>Parsed Transactions ({transactions.length})</h2>
+			{#if detectedParser}
+				<p class="parser-info">Detected template: <strong>{detectedParser}</strong></p>
+			{/if}
 			<button type="button" onclick={downloadCsv}>Download CSV</button>
 			<table>
 				<thead>
@@ -214,7 +201,7 @@
 			</table>
 			<h3>CSV Output</h3>
 			<textarea readonly value={csvOutput} rows="10"></textarea>
-			<button type="button" onclick={() => { transactions = []; csvOutput = ''; }}>Upload Another</button>
+			<button type="button" onclick={() => { transactions = []; csvOutput = ''; detectedParser = null; parseError = null; }}>Upload Another</button>
 		</div>
 	{/if}
 </div>
@@ -228,8 +215,19 @@
 		padding: 20px;
 		box-sizing: border-box;
 	}
-	.upload-form, .password-prompt, .results {
+	.upload-form, .password-prompt, .results, .error-container {
 		text-align: center;
+	}
+	.error-container {
+		max-width: 500px;
+	}
+	.error-container p {
+		color: #d32f2f;
+		margin: 20px 0;
+	}
+	.parser-info {
+		color: #388e3c;
+		margin: 10px 0;
 	}
 	.password-prompt input {
 		display: block;
