@@ -1,7 +1,8 @@
 import type { Parser, Transaction } from './types';
 import { mandiriParser } from './mandiri';
+import { briParser } from './bri';
 
-export const parsers: Parser[] = [mandiriParser];
+export const parsers: Parser[] = [mandiriParser, briParser];
 
 export function identifyParser(text: string): Parser | null {
 	for (const parser of parsers) {
@@ -23,5 +24,5 @@ export function parseTransactions(text: string): { parser: Parser | null; transa
 	return { parser, transactions };
 }
 
-export { mandiriParser };
+export { mandiriParser, briParser };
 export type { Transaction, Parser } from './types';
