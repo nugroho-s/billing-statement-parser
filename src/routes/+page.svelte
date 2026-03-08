@@ -1,8 +1,10 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { browser } from '$app/environment';
 
 	let pdfjsLib: typeof import('pdfjs-dist');
+	let showPasswordPrompt = $state(false);
+	let password = $state('');
+	let pendingFileData: Uint8Array | null = $state(null);
 
 	onMount(async () => {
 		pdfjsLib = await import('pdfjs-dist');
@@ -11,18 +13,13 @@
 		pdfjsLib.GlobalWorkerOptions.workerPort = new pdfjsWorker.default();
 	});
 
-	async function isPdfEncrypted(file: File) {
-		const arrayBuffer = await file.arrayBuffer();
-		const uint8Array = new Uint8Array(arrayBuffer);
-		const pdfHeader = String.fromCharCode(...uint8Array.slice(0, 1024));
-		return pdfHeader.includes('/Encrypt');
-	}
-
-	async function extractTextFromPdf(arrayBuffer: ArrayBuffer) {
+	async function extractTextFromPdf(data: Uint8Array, password?: string) {
 		if (!pdfjsLib) {
 			throw new Error('PDF library not loaded');
 		}
-		const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+
+		const dataCopy = new Uint8Array(data);
+		const pdf = await pdfjsLib.getDocument({ data: dataCopy, password: password || '' }).promise;
 		const numPages = pdf.numPages;
 		let fullText = '';
 
@@ -47,31 +44,83 @@
 			return;
 		}
 
-		if (await isPdfEncrypted(file)) {
-			alert('The uploaded PDF is encrypted. Please upload an unencrypted PDF.');
-			return;
-		}
-
 		try {
 			const arrayBuffer = await file.arrayBuffer();
-			const result = await extractTextFromPdf(arrayBuffer);
+			const data = new Uint8Array(arrayBuffer);
+			await parsePdf(data);
+		} catch (error) {
+			handleError(error);
+		}
+	}
 
+	async function parsePdf(data: Uint8Array, password?: string) {
+		try {
+			const result = await extractTextFromPdf(data, password);
 			console.log('Extracted text:', result.text);
 			console.log('Pages:', result.pages);
 			alert('PDF parsed successfully! Check console for extracted text.');
+			resetState();
 		} catch (error) {
-			console.error('Error parsing PDF:', error);
-			alert('Failed to parse PDF. Please try again.');
+			if (isPasswordException(error)) {
+				showPasswordPrompt = true;
+				pendingFileData = data;
+			} else {
+				throw error;
+			}
 		}
+	}
+
+	async function submitPassword() {
+		if (!pendingFileData) return;
+
+		try {
+			await parsePdf(pendingFileData, password);
+		} catch (error) {
+			if (isPasswordException(error)) {
+				alert('Incorrect password. Please try again.');
+			} else {
+				handleError(error);
+			}
+		}
+	}
+
+	function isPasswordException(error: unknown): boolean {
+		return error !== null && typeof error === 'object' && 'name' in error && error.name === 'PasswordException';
+	}
+
+	function handleError(error: unknown) {
+		console.error('Error parsing PDF:', error);
+		alert('Failed to parse PDF. Please try again.');
+	}
+
+	function resetState() {
+		showPasswordPrompt = false;
+		password = '';
+		pendingFileData = null;
+	}
+
+	function cancelPassword() {
+		resetState();
 	}
 </script>
 
 <div class="upload-container">
-	<form class="upload-form">
-		<label for="pdfFile">Upload PDF:</label>
-		<input type="file" id="pdfFile" accept="application/pdf" />
-		<button type="button" onclick={handleUpload}>Upload</button>
-	</form>
+	{#if showPasswordPrompt}
+		<div class="password-prompt">
+			<p>This PDF is password protected. Enter the password to decrypt:</p>
+			<input type="password" bind:value={password} placeholder="Enter password" />
+			<div class="button-group">
+				<button type="button" onclick={submitPassword}>Decrypt</button>
+				<button type="button" onclick={cancelPassword}>Cancel</button>
+			</div>
+		</div>
+	{:else}
+		<form class="upload-form">
+			<label for="pdfFile">Upload PDF:</label>
+			<input type="file" id="pdfFile" accept="application/pdf" />
+			<button type="button" onclick={handleUpload}>Upload</button>
+		</form>
+	{/if}
 </div>
 
 <style>
@@ -81,7 +130,19 @@
 		align-items: center;
 		height: 100vh;
 	}
-	.upload-form {
+	.upload-form, .password-prompt {
 		text-align: center;
+	}
+	.password-prompt input {
+		display: block;
+		margin: 10px auto;
+		padding: 8px;
+		width: 200px;
+	}
+	.button-group {
+		margin-top: 10px;
+	}
+	.button-group button {
+		margin: 0 5px;
 	}
 </style>
