@@ -265,6 +265,12 @@
 			<input type="file" id="pdfFile" accept="application/pdf" />
 			<button type="button" onclick={handleUpload}>Upload</button>
 		</form>
+		<footer>
+			<p>
+				<a href="https://github.com/nugroho-s/billing-statement-parser" target="_blank" rel="noopener noreferrer">Contribute on GitHub</a>
+				| <a href="mailto:mail@nugsky.me">Submit PDF template for other banks</a>
+			</p>
+		</footer>
 	{/if}
 </div>
 
@@ -360,5 +366,22 @@
 		margin: 10px 5px;
 		padding: 8px 16px;
 		cursor: pointer;
+	}
+	footer {
+		position: fixed;
+		bottom: 20px;
+		text-align: center;
+		width: 100%;
+	}
+	footer p {
+		margin: 0;
+		color: #666;
+	}
+	footer a {
+		color: #1565c0;
+		text-decoration: none;
+	}
+	footer a:hover {
+		text-decoration: underline;
 	}
 </style>
