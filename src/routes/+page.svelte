@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { parsers, type Transaction, type Parser } from '$lib';
+	import { parsers, identifyParser, type Transaction, type Parser } from '$lib';
 
 	let pdfjsLib: typeof import('pdfjs-dist');
 	let showPasswordPrompt = $state(false);
@@ -98,7 +98,7 @@
 			extractedText = result.text;
 			transactions = [];
 			csvOutput = '';
-			selectedParser = '';
+			selectedParser = identifyParser(result.text)?.name || '';
 			parseError = null;
 			showPasswordPrompt = false;
 			password = '';
